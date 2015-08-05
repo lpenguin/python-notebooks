@@ -1,23 +1,23 @@
 
 # coding: utf-8
 
-# In[1]:
+# In[2]:
 
 import pandas as pd
 
 
-# In[11]:
+# In[3]:
 
 meta_set = pd.read_pickle('../data/set_with_meta.pickle')
 meta_set[:2]
 
 
-# In[79]:
+# In[4]:
 
 meta_set[meta_set['accession'] == 'GSE21422']
 
 
-# In[78]:
+# In[5]:
 
 meta_set['disease'] = meta_set['disease'].map(lambda x: x.strip())
 
@@ -89,7 +89,7 @@ len(annotations)
 meta_set.accession.unique().shape
 
 
-# In[90]:
+# In[6]:
 
 series_diseases = meta_set.groupby('accession')['disease'].apply(set)
 series_diseases[:10]
@@ -124,6 +124,7 @@ def match(diseases_correct, diseases):
             m += 1
             
     return m/len(diseases_correct), (len(diseases) - m)/len(diseases)
+
 scores['match'] = scores.apply(lambda row: match(row['diseases_correct'], row['diseases'])[0], axis=1)
 scores['garb'] = scores.apply(lambda row: match(row['diseases_correct'], row['diseases'])[1], axis=1)
 scores['str.diseases_correct'] = scores['diseases_correct'].map(', '.join)
@@ -146,7 +147,17 @@ scores[(scores['garb'] > 0.0)][['match','garb','str.diseases_correct','str.disea
 print(scores[(scores['garb'] > 0.0) |(scores['match'] < 1.0)].shape[0], scores.shape[0])
 
 
-# In[76]:
+# In[1]:
 
 scores.loc['GSE32924']['str.diseases']
+
+
+# In[11]:
+
+series_diseases[series_diseases.map(lambda x: len(x) == 1)].shape, series_diseases.shape
+
+
+# In[9]:
+
+
 
