@@ -4,7 +4,7 @@ import misc.obo
 reload(misc.obo)
 from misc.obo import read_ontology
 
-ontology = read_ontology('data/age-biomarkers/brenda-tissue-ontology.obo')
+ontology = read_ontology('data/age-biomarkers/brenda-tissue-ontology.obo', exclude_duplicates=True)
 
 import elasticsearch
 es = elasticsearch.Elasticsearch()
@@ -17,7 +17,7 @@ actions = [dict(
     _index=index_name,
     _type=index_name,
     _source=dict(
-        id=int(item.id.split(":")[1]),
+        id=item.id,
         names=item.names()
     )
 ) for item in ontology.items()]

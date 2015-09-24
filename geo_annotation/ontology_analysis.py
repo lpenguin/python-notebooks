@@ -10,6 +10,8 @@ import misc.obo
 reload(misc.obo)
 from misc.obo import read_ontology
 import networkx as nx
+import numpy as np
+import pandas as pd
 
 ontology = read_ontology('data/age-biomarkers/brenda-tissue-ontology.obo')
 
@@ -41,7 +43,7 @@ for i in range(path_mat.shape[0]):
 
 # нету путей туда обратно, ну и ок
 
-import numpy as np
+
 
 
 def contains_syns(ontology, id1, id2):
@@ -121,12 +123,12 @@ res = search_utils.search_ontology(client=es,
                                    index='brenda-ontology',
                                    ontology=ontology)
 
-def ontology_id(item_id: int, ontology_name: str='BTO'):
-    return "{ontology_name}:{id:07}".format(ontology_name=ontology_name,
-                                           id=item_id)
-
-
-res = dict((ontology_id(name, 'BTO'), value) for name, value in res.items())
+# def ontology_id(item_id: int, ontology_name: str='BTO'):
+#     return "{ontology_name}:{id:07}".format(ontology_name=ontology_name,
+#                                            id=item_id)
+#
+#
+# res = dict((ontology_id(name, 'BTO'), value) for name, value in res.items())
 
 syns_graph = nx.DiGraph()
 
@@ -290,3 +292,15 @@ for (i, j) in zip(*syns_check):
 2                             PNET cell                                       PPNET cell
 3                                   NaN           PPNET-peripheral neuroepithelioma cell
 """
+
+# Напоследок, перезагрузим граф
+import geo_annotation.search_utils
+reload(geo_annotation.search_utils)
+ontology = read_ontology('data/age-biomarkers/brenda-tissue-ontology.obo', exclude_duplicates=True)
+
+syns_graph = geo_annotation.search_utils.build_synonyms_graph(ontology=ontology,
+                                                              client=es,
+                                                              index='brenda-ontology')
+
+for d in geo_annotation.search_utils.analyze_digraph(syns_graph, ontology):
+    print(d)

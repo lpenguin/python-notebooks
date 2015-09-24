@@ -100,7 +100,10 @@ class Record:
         return self.__dict__
 
     def __str__(self):
-        return self.dict()
+        return str(self.dict())
+
+    def __repr__(self):
+        return self.__str__()
 
     def int_id(self):
         _, str_id = self.id.split(":")
@@ -111,7 +114,7 @@ class Record:
 
 
 class Ontology:
-    def __init__(self, graph: nx.DiGraph, records: [Record], exclude_duplicates:bool=False):
+    def __init__(self, graph: nx.DiGraph, records: [Record], exclude_duplicates: bool=False):
         assert isinstance(records, list)
         assert isinstance(graph, nx.DiGraph)
 

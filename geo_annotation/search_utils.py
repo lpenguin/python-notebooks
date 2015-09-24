@@ -2,6 +2,9 @@ from collections import defaultdict
 from elasticsearch import Elasticsearch
 from elasticsearch_dsl.query import MultiMatch, Match, Q
 from elasticsearch_dsl import Search
+import networkx as nx
+import numpy as np
+import pandas as pd
 from misc.obo import Record, Ontology
 
 
@@ -41,12 +44,11 @@ def search_term(es, term, index, fields=None, ids=None, id_field='id') -> [str]:
 
 
 def search_item(client: Elasticsearch, item: Record, index: str, ids: [str]=None, id_field: str='id'):
-    names = [item.name] + item.synonyms
     return search_term(es=client,
-                      term=names,
-                      index=index,
-                      ids=ids,
-                      id_field=id_field)
+                       term=item.names(),
+                       index=index,
+                       ids=ids,
+                       id_field=id_field)
 
 
 def search_ontology(client: Elasticsearch, ontology: Ontology, index: str, ids: [str]=None, id_field: str='id'):
@@ -63,3 +65,45 @@ def search_ontology(client: Elasticsearch, ontology: Ontology, index: str, ids: 
         for i in res_ids:
             res[i].append(item_id)
     return dict(res)
+
+
+def build_synonyms_graph(ontology: Ontology, client: Elasticsearch, index: str)->nx.DiGraph:
+    res = search_ontology(ontology=ontology,
+                          client=client,
+                          index=index)
+
+    graph = nx.DiGraph()
+    for dest_id, source_ids in res.items():
+        for source_id in source_ids:
+            if source_id != dest_id:
+                graph.add_edge(source_id, dest_id)
+
+    return graph
+
+
+def analyze_digraph(graph: nx.DiGraph, ontology: Ontology):
+    res = []
+    mat = nx.to_numpy_matrix(graph)
+
+    syns_check = np.nonzero(np.triu(np.multiply(
+        mat,
+        np.transpose(mat)
+    )))
+
+    nodes = graph.nodes()
+
+    for (i, j) in zip(*syns_check):
+        names_i = ontology.meta[nodes[i]].names()
+        names_j = ontology.meta[nodes[j]].names()
+
+        l = max(len(names_i), len(names_j))
+
+        names_i += [np.nan] * (l - len(names_i))
+        names_j += [np.nan] * (l - len(names_j))
+        d = pd.DataFrame({
+            ontology.meta[nodes[i]].id: names_i,
+            ontology.meta[nodes[j]].id: names_j
+        })
+
+        res.append(d)
+    return res
