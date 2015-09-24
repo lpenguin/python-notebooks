@@ -1,9 +1,6 @@
 
 # coding: utf-8
-
-# In[1]:
-
-get_ipython().magic('run ../misc/pandas-monkey.ipynb')
+#%%
 
 import pymongo
 db = pymongo.MongoClient().scraper_meta
@@ -18,12 +15,16 @@ platforms = ['GPL' + str(x) for x in [
             # 5188, getting strange errors
             8321
         ]]
+#%%
+        
+platforms = ['GPL4133','GPL6480','GPL15849','GPL1708','GPL887','GPL4091','GPL9128','GPL7264','GPL11387','GPL8687','GPL6848','GPL2879','GPL5477','GPL8841','GPL10123','GPL4093','GPL11386','GPL10806','GPL8269','GPL10150','GPL8583','GPL15931','GPL4126','GPL10152','GPL16050','GPL2567','GPL9053','GPL14550','GPL5325','GPL10808','GPL13691','GPL9075','GPL8736','GPL885','GPL9777','GPL7504','GPL8693','GPL2873','GPL17077','GPL10734','GPL13953','GPL13607','GPL13685','GPL7015','GPL15560','GPL18623','GPL10481','GPL16280','GPL8737','GPL11068']
+#%%
 db.samples.count({'platform': {'$in': platforms}})
 
 
 # In[1]:
 
-(97405 * 300) / (50) / (3600 * 24)
+(102393 * 300) / (50) / (3600 * 24)
 # Семь суток будут препроцессится все семплы для аффиметриксовых платформ
 
 
@@ -32,10 +33,13 @@ db.samples.count({'platform': {'$in': platforms}})
 import pandas as pd
 
 s = pd.DataFrame(list(db.samples.find({'platform': {'$in': platforms}}, 
-                                      {'accession': 1, 'series': 1, 'platform': 1})))\
+                                      {'accession': 1, 'series': 1, 'platform': 1,
+                                       'channel': 1})))\
     .expand('series')
 s[:1]
 
+#%%
+s.drop_duplicates(subset=['accession'], inplace=True)
 
 # In[7]:
 
@@ -49,35 +53,6 @@ samples_by_series[:5]
 
 # In[10]:
 
-samples_by_series.to_csv('series_affy.csv', index=False, header=True)
+samples_by_series.to_csv('series_agilent_2ch.csv', index=False, header=True)
 
-
-# In[12]:
-
-get_ipython().system('ls -lah *.csv')
-
-
-# In[13]:
-
-get_ipython().system('scp *.csv npryanichnikov@ui2.computing.kiae.ru:/home/users/npryanichnikov/ls2/preproc/')
-
-
-# In[42]:
-
-get_ipython().system('git add ../elasitc-annotation/ ../misc/ ../stargeo-annotation.ipynb ../data/pharm-atlas/')
-
-
-# In[44]:
-
-get_ipython().system('git add preproc-prepare.ipynb')
-
-
-# In[46]:
-
-get_ipython().system("git commit -am 'preproc prepare'")
-
-
-# In[47]:
-
-get_ipython().system('git push origin master')
 

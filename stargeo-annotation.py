@@ -7,13 +7,15 @@ import pymongo
 import pandas as pd
 
 db = pymongo.MongoClient().stargeo
-
-
 # In[10]:
 
 samples = pd.DataFrame(list(db.samples.find()))
 print(samples.shape)
 samples[:5]
+# In[106]:
+
+samples['tags'] = samples['tags'].map(lambda tags: set(t.strip() for t in tags))
+samples[:10]
 
 
 # In[25]:
@@ -22,20 +24,6 @@ tags_set = set()
 for tags in samples.tags:
     for t in tags:
         tags_set.add(t)
-set(t.lower().replace('_non_tumour', '').replace('_tumour', '').replace('_tumor', '') for t in tags_set if ('control' not in t.lower() and 'ctrl' not in t.lower()))
-
-
-# In[33]:
-
-# t = pd.DataFrame(data=list(tags_set), columns=['tag'])
-# t['disease'] = ''
-# t.to_csv('data/tags.csv', sep=',')GSE38246 
-
-
-# In[89]:
-
-samples[samples.tags.map(lambda x: 'UC' in x)].groupby('series').first()
-
 
 # In[112]:
 
@@ -45,40 +33,49 @@ t.columns = ['id', 'tag', 'disease']
 t['disease'] = t['disease'].map(lambda x: x.lower().replace("'", '').strip())
 t['disease'] = t['disease'].map(lambda x: np.nan if x == '' else x)
 t['disease'].value_counts().shape
+t['tag'] = t['tag'].map(lambda x: x.lower())
 
+#%%
+def contains_values(string, values):
+    for value in values:
+        if value in string:
+            return True
+    return False
+    
 
-# In[ ]:
-
-
-
-
-# In[106]:
-
-samples['tags'] = samples['tags'].map(lambda tags: set(t.strip() for t in tags))
-samples[:10]
-
-
-# In[117]:
-
-# t.set_index('tag', inplace=True)
-t[:10]
+t_cleaned = (t[t['tag'].map(lambda x: not contains_values(x, [
+        'control', 'ctrl', 'normal', 'non_tumour', 'non_tumor']))]
+            .dropna(subset=['disease'])
+            .set_index('tag'))
+        
+#%%
 tag_to_disease = {}
-for tag, disease in t.set_index('tag').disease.dropna().items():
+for tag, disease in t_cleaned['disease'].items():
     tag_to_disease[tag.strip()] = disease.strip()
 
 
 # In[120]:
 
 def to_disease(tags):
-    return set(tag_to_disease[tag] for tag in tags if tag in tag_to_disease)
+    result = set(tag_to_disease[tag.lower()] for tag in tags if tag.lower() in tag_to_disease)
+    return result if result else np.nan
+    
 samples['disease'] = samples['tags'].map(to_disease)
-samples[:10]
+samples[:3]
 
+#%%
+samples_with_disease = samples.dropna(subset=['disease'])
+
+#%%
+from misc import pandas_monkey
+pandas_monkey.pandas_patch()
+#%%
+se = samples_with_disease.expand('disease')
 
 # In[134]:
 
 def make_train_set(samples):
-    samples = samples[samples['disease'].map(lambda x: len(x) > 0)]
+#    samples = samples[samples['disease'].map(lambda x: len(x) > 0)]
     print('Good samples {}'.format(samples.shape))
     db = pymongo.MongoClient().scraper_meta
     
@@ -106,13 +103,14 @@ def make_train_set(samples):
        'sample_description', 'norm_or_tumour', 'sample_source_name']]
     return _t
 #     train_set = pd.merge(samples, series, left_on='series')
-out = make_train_set(samples)
+out = make_train_set(se)
 out.to_csv('data/stargeo_train_set.csv', set=';')
 
+#%%
+se_series = se.drop_duplicates(subset=['series', 'disease'])
 
-# In[124]:
+#%%
+se_series.to_pickle('data/se_series.pickle')
 
-ts = pd.read_csv('data/out_training_set_exp.csv', sep=';')
-print(ts.columns)
-ts[:5]
+
 

@@ -21,7 +21,9 @@ for e in exprs:
 
 # In[36]:
 
-samples[1][:10]
+samples[1]
+s = samples[1]
+"123".startswith('12')
 
 
 # In[37]:
@@ -31,6 +33,3 @@ for s in samples:
 
 
 # In[ ]:
-
-
-
