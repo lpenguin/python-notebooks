@@ -18,8 +18,12 @@ def read_obo_as_graph(file_name):
     return graph, items
 
 
-def read_ontology(file_name: str, exclude_duplicates: bool=False)->'Ontology':
+def read_ontology(file_name: str, exclude_duplicates: bool=False, subgraph=None)->'Ontology':
     graph, records = read_obo_as_graph(file_name)
+    if subgraph:
+        descendants = set(nx.descendants(graph, subgraph))
+        graph = nx.subgraph(graph, descendants)
+        records = [r for r in records if r.id in descendants]
     return Ontology(graph=graph, records=records, exclude_duplicates=exclude_duplicates)
 
 
