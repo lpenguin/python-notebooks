@@ -39,6 +39,7 @@ if not exists(annotation_result_file) or True:
     len(res)
 
     import pickle
+
     with open(annotation_result_file, 'wb') as f:
         pickle.dump(res, f)
 
@@ -46,11 +47,14 @@ else:
     with open(annotation_result_file, 'rb') as f:
         res = pickle.load(f)
 
+
 def doid_id(item_id):
     return "DOID:{:07}".format(item_id)
 
+
 def ontology_name(item_id):
     return ontology.meta[item_id].name
+
 
 def to_name(series_id):
     return "GSE{}".format(series_id)
@@ -68,7 +72,6 @@ view[view['matches_count'] > 1]
 ids = view.loc['GSE50081']['matches']
 
 
-
 @pymonad.curry
 def collapse_matches(graph: nx.DiGraph, matches):
     g = nx.DiGraph()
@@ -83,10 +86,8 @@ def collapse_matches(graph: nx.DiGraph, matches):
                 print('{}  not in graph'.format(id2))
                 continue
 
-
             if id1 != id2 and nx.has_path(graph, id1, id2):
                 g.add_edge(id1, id2)
-
 
     leafs = []
     for subg in nx.weakly_connected_component_subgraphs(g):
@@ -105,7 +106,7 @@ view['collapsed_matches_names'] = view['collapsed_matches'].map(lambda matches: 
 # nx.has_path(synonyms_graph, 'BTO:0000887', 'BTO:0001149')
 
 
-view.shape[0], view[view.matches_count == 1].shape[0], view[view.collapsed_matches_count==1].shape[0]
+view.shape[0], view[view.matches_count == 1].shape[0], view[view.collapsed_matches_count == 1].shape[0]
 # (289, 107, 149, 166)
 # Ок примерно до половины остается с одной тканью, пока все.
 view_m1 = view[view.collapsed_matches_count == 1].copy()
@@ -120,8 +121,11 @@ check_m1.shape, check_m1[check_m1['collapsed_matches'] == check_m1['doid']].shap
 
 check_m1['doid_names'] = check_m1['doid'].map(lambda matches: [ontology_name(m.strip()) for m in matches])
 
-check_m1[check_m1['collapsed_matches'] != check_m1['doid']][['collapsed_matches', 'doid', 'collapsed_matches_names', 'doid_names']]
+check_m1[check_m1['collapsed_matches'] != check_m1['doid']][
+    ['collapsed_matches', 'doid', 'collapsed_matches_names', 'doid_names']]
 check_m1.loc['GSE42252']
+
+
 # id                                               42252
 # matches                          [DOID:1793, DOID:162]
 # matches_names              [pancreatic cancer, cancer]
@@ -132,11 +136,36 @@ check_m1.loc['GSE42252']
 # doid                                      [DOID:10534]
 # doid_names                            [stomach cancer]
 
+
+def zip_map(mapf, series):
+    index = series[0].index
+    data = list(map(lambda xs: mapf(*xs), zip(*series)))
+    return pd.Series(data=data, index=index)
+
+
 # Если открыть GEO то высветится еще gastric cancer, которого нет в DOID
 # Скорее всего изза синонимии gaster и stomach,
 # однако, в синонимах DOID это не проставлено
+
+# @pymonad.curry
+def path_length(graph, id1, id2):
+    if id1 in graph.nodes() and \
+            id2 in graph.nodes() and \
+            nx.has_path(graph, id1, id2):
+        return len(nx.shortest_path(graph, id1, id2)) - 1 if id1 != id2 else 0
+    else:
+        return np.nan
+
+
 check_m11 = check_m1[check_m1['doid'].map(lambda d: len(d) == 1)].copy()
-check_m11['has_path_res_vd'] = [doid[0] in ontology.graph.nodes() and ontology.has_path(matches[0], doid[0]) for matches, doid in zip(check_m11['matches'], check_m11['doid'])]
+check_m11['has_path_res_vd'] = zip_map(lambda matches, doid: doid[0] in ontology.graph.nodes() and
+                                                             ontology.has_path(matches[0], doid[0]),
+                                       [check_m11['collapsed_matches'], check_m11['doid']])
+
+check_m11['absolute_match'] = zip_map(lambda matches, doid: matches[0] == doid[0],
+                                      [check_m11['collapsed_matches'], check_m11['doid']])
+
+check_m11['path_res_vd'] = zip_map(lambda m, d: path_length(ontology.graph, m[0], d[0]), [check_m11['collapsed_matches'], check_m11['doid']])
 check_m11[~check_m11['has_path_res_vd']]
 check_m11.loc['GSE51725']
 # matches                          [DOID:162]
@@ -164,3 +193,30 @@ check_m11.loc['GSE51105']
 # doid                                   [DOID:10534]
 # doid_names                         [stomach cancer]
 # has_path_res_vd                                True
+
+
+# check_m11[check_m11.path_res_vd == 3]
+#              id     matches matches_names  matches_count collapsed_matches  collapsed_matches_count collapsed_matches_names          doid        doid_names has_path_res_vd absolute_match  path_res_vd
+# GSE15459  15459  [DOID:162]      [cancer]              1        [DOID:162]                        1                [cancer]  [DOID:10534]  [stomach cancer]            True          False            3
+# GSE19826  19826  [DOID:162]      [cancer]              1        [DOID:162]                        1                [cancer]  [DOID:10534]  [stomach cancer]            True          False            3
+# GSE51725  51725  [DOID:162]      [cancer]              1        [DOID:162]                        1                [cancer]  [DOID:10534]  [stomach cancer]            True          False            3
+# GSE57303  57303  [DOID:162]      [cancer]              1        [DOID:162]                        1                [cancer]  [DOID:10534]  [stomach cancer]            True          False            3
+
+# Не нашел gastric
+
+
+check_m11[check_m11.path_res_vd == 0].shape, check_m11.shape
+# ((82, 12), (112, 12))
+# Очень неплохие результаты - прямых попаданий 82 из 112
+
+check_m11[check_m11.path_res_vd == 4]
+#              id                        matches                             matches_names  matches_count collapsed_matches  collapsed_matches_count  collapsed_matches_names         doid          doid_names has_path_res_vd absolute_match  path_res_vd
+# GSE21687  21687  [DOID:162, DOID:3093, DOID:4]  [cancer, nervous system cancer, disease]              3       [DOID:3093]                        1  [nervous system cancer]  [DOID:7497]  [brain ependymoma]            True          False            4
+
+# !!! тупо нет в тексте brain ependymoma, есть просто ependymoma
+
+# Идея как еще можно померить точность: размер входящих подболезней в онтологии
+# Такая метрика даст приблизительную оценку насколько "обща" проставленная болезнь
+
+# Теперь сделаем анализ всех попаданий
+
