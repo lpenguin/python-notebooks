@@ -26,13 +26,11 @@ def read_ontology(file_name: str, exclude_duplicates: bool=False, subgraph=None)
     :param skip_obsolete: skip records with "is_obsolete == True"
     :return:
     """
-    graph, records = read_obo_as_graph(file_name, skip_obsolote=skip_obsolete)
+    graph, records = read_obo_as_graph(file_name)
     if subgraph:
         descendants = set(nx.descendants(graph, subgraph))
         graph = nx.subgraph(graph, descendants)
         records = [r for r in records if r.id in descendants]
-    if skip_obsolete:
-        records = [r for r in records if not r.is_obsolete]
 
     return Ontology(graph=graph, records=records, exclude_duplicates=exclude_duplicates)
 

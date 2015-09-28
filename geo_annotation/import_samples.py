@@ -6,7 +6,7 @@ from elasticsearch_dsl import Mapping, String, Integer
 from elasticsearch.helpers import bulk
 import pymongo
 from time import sleep
-
+from misc.utils import iter_bucket
 
 es = Elasticsearch()
 ies = IndicesClient(es)
@@ -49,17 +49,6 @@ sleep(1)
 ies.open(index_name)
 
 db = pymongo.MongoClient().scraper_meta
-
-
-def iter_bucket(iterable):
-    page_size = 3000
-    bucket = []
-    for item in iterable:
-        bucket.append(item)
-        if len(bucket) > page_size:
-            yield bucket
-            bucket = []
-    yield bucket
 
 
 def fields(fields_list):

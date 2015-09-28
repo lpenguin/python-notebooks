@@ -1,16 +1,16 @@
 from importlib import reload
+from os.path import exists
+
 import networkx as nx
 import numpy as np
 import pandas as pd
+from elasticsearch import Elasticsearch
+
 from misc.obo import read_ontology
 import misc.obo
 import geo_annotation.search_utils
-from geo_annotation.search_utils import search_ontology, build_synonyms_graph, search_item, search_term
-from elasticsearch import Elasticsearch
-from misc.utils import align_length_dict
-import pymonad
-import pickle
-from os.path import exists
+from geo_annotation.search_utils import search_ontology
+from misc.utils import collapse_matches, zip_map_series
 
 reload(geo_annotation.search_utils)
 reload(misc.obo)
@@ -71,33 +71,6 @@ view[view['matches_count'] > 1]
 # Попытаемся построить графы из заматчивших тканей
 ids = view.loc['GSE50081']['matches']
 
-
-@pymonad.curry
-def collapse_matches(graph: nx.DiGraph, matches):
-    g = nx.DiGraph()
-    g.add_nodes_from(matches)
-    for id1 in matches:
-        for id2 in matches:
-            if id1 not in graph:
-                print('{}  not in graph'.format(id1))
-                continue
-
-            if id2 not in graph:
-                print('{}  not in graph'.format(id2))
-                continue
-
-            if id1 != id2 and nx.has_path(graph, id1, id2):
-                g.add_edge(id1, id2)
-
-    leafs = []
-    for subg in nx.weakly_connected_component_subgraphs(g):
-        for node in subg.nodes_iter():
-            if not subg.successors(node):
-                leafs.append(node)
-
-    return leafs
-
-
 view['collapsed_matches'] = view['matches'].map(collapse_matches(ontology.graph))
 view['collapsed_matches_count'] = view['collapsed_matches'].map(len)
 view['collapsed_matches_names'] = view['collapsed_matches'].map(lambda matches: [ontology_name(m) for m in matches])
@@ -137,17 +110,9 @@ check_m1.loc['GSE42252']
 # doid_names                            [stomach cancer]
 
 
-def zip_map(mapf, series):
-    index = series[0].index
-    data = list(map(lambda xs: mapf(*xs), zip(*series)))
-    return pd.Series(data=data, index=index)
-
-
 # Если открыть GEO то высветится еще gastric cancer, которого нет в DOID
 # Скорее всего изза синонимии gaster и stomach,
 # однако, в синонимах DOID это не проставлено
-
-# @pymonad.curry
 def path_length(graph, id1, id2):
     if id1 in graph.nodes() and \
             id2 in graph.nodes() and \
@@ -158,14 +123,14 @@ def path_length(graph, id1, id2):
 
 
 check_m11 = check_m1[check_m1['doid'].map(lambda d: len(d) == 1)].copy()
-check_m11['has_path_res_vd'] = zip_map(lambda matches, doid: doid[0] in ontology.graph.nodes() and
+check_m11['has_path_res_vd'] = zip_map_series(lambda matches, doid: doid[0] in ontology.graph.nodes() and
                                                              ontology.has_path(matches[0], doid[0]),
                                        [check_m11['collapsed_matches'], check_m11['doid']])
 
-check_m11['absolute_match'] = zip_map(lambda matches, doid: matches[0] == doid[0],
+check_m11['absolute_match'] = zip_map_series(lambda matches, doid: matches[0] == doid[0],
                                       [check_m11['collapsed_matches'], check_m11['doid']])
 
-check_m11['path_res_vd'] = zip_map(lambda m, d: path_length(ontology.graph, m[0], d[0]), [check_m11['collapsed_matches'], check_m11['doid']])
+check_m11['path_res_vd'] = zip_map_series(lambda m, d: path_length(ontology.graph, m[0], d[0]), [check_m11['collapsed_matches'], check_m11['doid']])
 check_m11[~check_m11['has_path_res_vd']]
 check_m11.loc['GSE51725']
 # matches                          [DOID:162]
