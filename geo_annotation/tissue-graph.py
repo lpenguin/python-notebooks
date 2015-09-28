@@ -70,6 +70,15 @@ def collapse_matches(graph: nx.DiGraph, matches):
     g.add_nodes_from(matches)
     for id1 in matches:
         for id2 in matches:
+            if id1 not in graph:
+                print('{}  not in graph'.format(id1))
+                continue
+
+            if id2 not in graph:
+                print('{}  not in graph'.format(id2))
+                continue
+
+
             if id1 != id2 and nx.has_path(graph, id1, id2):
                 g.add_edge(id1, id2)
 
@@ -87,7 +96,7 @@ view['collapsed_matches'] = view['matches'].map(collapse_matches(ontology.graph)
 view['collapsed_matches_count'] = view['collapsed_matches'].map(len)
 view['collapsed_matches_names'] = view['collapsed_matches'].map(lambda matches: [brenda_name(m) for m in matches])
 view['collapsed_matches_syns'] = view['collapsed_matches'].map(collapse_matches(synonyms_graph))
-
+view['collapsed_matches_syns_count'] = view['collapsed_matches_syns'].map(len)
 pd.DataFrame(align_length_dict(view.loc['GSE16395']))
 pd.DataFrame(align_length_dict(view.loc['GSE30806']))
 #   collapsed_matches  collapsed_matches_count collapsed_matches_names     id      matches  matches_count matches_names
@@ -100,4 +109,8 @@ pd.DataFrame(align_length_dict(view.loc['GSE30806']))
 nx.has_path(synonyms_graph, 'BTO:0000887', 'BTO:0001149')
 
 [item for item in ontology.items() if any('CD3'.lower() in name for name in item.names())]
+
+view.shape[0], view[view.matches_count == 1].shape[0], view[view.collapsed_matches_count==1].shape[0], view[view.collapsed_matches_syns_count==1].shape[0]
+# (289, 107, 149, 166)
+# Ок примерно до половины остается с одной тканью, пока все.
 

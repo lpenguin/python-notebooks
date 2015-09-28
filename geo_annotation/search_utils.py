@@ -40,6 +40,7 @@ def search_term(es, term, index, fields=None, ids=None, id_field='id') -> [str]:
         s = s.query(query_for_term(term, fields))
 
     s = s.extra(fields=[id_field])
+    print(s.to_dict())
     return [item._d_[id_field][0] for item in iter_search(s)]
 
 

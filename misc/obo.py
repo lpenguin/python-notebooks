@@ -18,12 +18,22 @@ def read_obo_as_graph(file_name):
     return graph, items
 
 
-def read_ontology(file_name: str, exclude_duplicates: bool=False, subgraph=None)->'Ontology':
+def read_ontology(file_name: str, exclude_duplicates: bool=False, subgraph=None, skip_obsolete=False)->'Ontology':
+    """
+    :param file_name: read from file
+    :param exclude_duplicates: exclude duplicate records from synonyms
+    :param subgraph: take subgraph maked of descendants of "subgraph" node
+    :param skip_obsolete: skip records with "is_obsolete == True"
+    :return:
+    """
     graph, records = read_obo_as_graph(file_name)
     if subgraph:
         descendants = set(nx.descendants(graph, subgraph))
         graph = nx.subgraph(graph, descendants)
         records = [r for r in records if r.id in descendants]
+    if skip_obsolete:
+        records = [r for r in records if not r.is_obsolete]
+
     return Ontology(graph=graph, records=records, exclude_duplicates=exclude_duplicates)
 
 
