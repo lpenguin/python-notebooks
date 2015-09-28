@@ -1,17 +1,19 @@
 # importing all series into elastic search index
 
-
-
-#%%
 from elasticsearch import Elasticsearch
 from elasticsearch.client import IndicesClient
+from elasticsearch_dsl import Mapping, String, Integer
+from time import sleep
+
+
 es = Elasticsearch()
 ies = IndicesClient(es)
 
 if ies.exists('series'):
     ies.delete('series')
 ies.create('series')
-from elasticsearch_dsl import Mapping, String, Integer
+sleep(1)
+ies.close('series')
 m = Mapping('series')
 
 m.field('accession', String(index='not_analyzed'))
@@ -25,7 +27,21 @@ m.field('summary', String())
 m.field('overall_design', String())
 
 m.save('series', using=es)
-#%%
+
+ies.put_settings(index='series', body={
+    "analysis":{
+      "analyzer":{
+        "default":{
+          "type":"custom",
+          "tokenizer":"standard",
+          "filter":[ "standard", "lowercase", "stop", "kstem" ]
+        }
+      }
+    }
+})
+sleep(1)
+ies.open('series')
+
 import pymongo
 db = pymongo.MongoClient().scraper_meta
 db.series.count()

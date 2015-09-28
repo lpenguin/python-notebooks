@@ -5,7 +5,7 @@ import pandas as pd
 from misc.obo import read_ontology
 import misc.obo
 import geo_annotation.search_utils
-from geo_annotation.search_utils import search_ontology, build_synonyms_graph
+from geo_annotation.search_utils import search_ontology, build_synonyms_graph, search_item, search_term
 from elasticsearch import Elasticsearch
 from misc.utils import align_length_dict
 import pymonad
@@ -24,14 +24,13 @@ larisa_vd_ids = [int(x) for x in larisa_vd['id'].unique()]
 es = Elasticsearch()
 # Берем только последователей BTO:0001489 (whole body)
 ontology = read_ontology('data/geo-annotation/doid.obo',
-                         exclude_duplicates=True,
-                         skip_obsolete=False)
+                         exclude_duplicates=True)
 
 # # Граф синонимов
 # synonyms_graph = build_synonyms_graph(ontology, es, 'brenda-ontology')
 
 annotation_result_file = 'data/geo-annotation/series.disease.res1.pickle'
-if not exists(annotation_result_file):
+if not exists(annotation_result_file) or True:
     res = search_ontology(client=es,
                           ontology=ontology,
                           index='series',
@@ -105,7 +104,6 @@ view['collapsed_matches_names'] = view['collapsed_matches'].map(lambda matches: 
 # view['collapsed_matches_syns_count'] = view['collapsed_matches_syns'].map(len)
 # nx.has_path(synonyms_graph, 'BTO:0000887', 'BTO:0001149')
 
-[item for item in ontology.items() if any('CD3'.lower() in name for name in item.names())]
 
 view.shape[0], view[view.matches_count == 1].shape[0], view[view.collapsed_matches_count==1].shape[0]
 # (289, 107, 149, 166)
@@ -118,7 +116,7 @@ vd = pd.DataFrame(vd.groupby('series').doid.apply(lambda x: list(set(x)))).reset
 check_m1 = pd.merge(view_m1, vd.set_index('series'), left_index=True, right_index=True)
 check_m1.shape, check_m1[check_m1['collapsed_matches'] == check_m1['doid']].shape
 
-# ((82, 8), (51, 8)) многовато ошибок
+# ((121, 8), (82, 8)) многовато ошибок
 
 check_m1['doid_names'] = check_m1['doid'].map(lambda matches: [ontology_name(m.strip()) for m in matches])
 
@@ -140,37 +138,29 @@ check_m1.loc['GSE42252']
 check_m11 = check_m1[check_m1['doid'].map(lambda d: len(d) == 1)].copy()
 check_m11['has_path_res_vd'] = [doid[0] in ontology.graph.nodes() and ontology.has_path(matches[0], doid[0]) for matches, doid in zip(check_m11['matches'], check_m11['doid'])]
 check_m11[~check_m11['has_path_res_vd']]
-check_m11.loc['GSE16155']
-# id                                           16155
-# matches                                [DOID:1712]
-# matches_names              [aortic valve stenosis]
-# matches_count                                    1
-# collapsed_matches                      [DOID:1712]
-# collapsed_matches_count                          1
-# collapsed_matches_names    [aortic valve stenosis]
-# doid                                   [DOID:7497]
-# doid_names                      [brain ependymoma]
-# has_path_res_vd                              False
+check_m11.loc['GSE51725']
+# matches                          [DOID:162]
+# matches_names                      [cancer]
+# matches_count                             1
+# collapsed_matches                [DOID:162]
+# collapsed_matches_count                   1
+# collapsed_matches_names            [cancer]
+# doid                           [DOID:10534]
+# doid_names                 [stomach cancer]
+# has_path_res_vd                        True
 
-# ТАМ ВОБЩЕ НЕТ СЛОВ aortic valve stenosis
+# Опять траблы с gastric == stomach
+# Наверное надо модифицировать синонимы
 
-check_m11.loc['GSE34942']
-# id                                            34942
-# matches                        [DOID:299, DOID:162]
-# matches_names              [adenocarcinoma, cancer]
+# Плюс надо просерить насколько длинный путь от полученного до проверочного
+
+check_m11.loc['GSE51105']
+# matches                       [DOID:162, DOID:2394]
+# matches_names              [cancer, ovarian cancer]
 # matches_count                                     2
-# collapsed_matches                        [DOID:299]
+# collapsed_matches                       [DOID:2394]
 # collapsed_matches_count                           1
-# collapsed_matches_names            [adenocarcinoma]
-# doid                                    [DOID:3717]
-# doid_names                 [gastric adenocarcinoma]
-# has_path_res_vd                               False
-
-# ??? нет пути из adenocarcinoma в gastric adenocarcinoma
-# ?? Почему вообще не нашлось gastric adenocarcinoma
-
-from geo_annotation.search_utils import search_term, search_item
-search_item(es, ontology.meta['DOID:3717'], 'series', ids=[34942])
-search_item(es, ontology.meta['DOID:3717'], 'series', ids=[34942])
-search_term(es, ['gastric adenocarcinomas'], 'series', ids=[34942])
-# Какаято гадость, adenocarcinomas ищет, а adenocarcinoma нет
+# collapsed_matches_names            [ovarian cancer]
+# doid                                   [DOID:10534]
+# doid_names                         [stomach cancer]
+# has_path_res_vd                                True

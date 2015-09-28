@@ -18,7 +18,7 @@ def read_obo_as_graph(file_name):
     return graph, items
 
 
-def read_ontology(file_name: str, exclude_duplicates: bool=False, subgraph=None, skip_obsolete=False)->'Ontology':
+def read_ontology(file_name: str, exclude_duplicates: bool=False, subgraph=None)->'Ontology':
     """
     :param file_name: read from file
     :param exclude_duplicates: exclude duplicate records from synonyms
@@ -26,7 +26,7 @@ def read_ontology(file_name: str, exclude_duplicates: bool=False, subgraph=None,
     :param skip_obsolete: skip records with "is_obsolete == True"
     :return:
     """
-    graph, records = read_obo_as_graph(file_name)
+    graph, records = read_obo_as_graph(file_name, skip_obsolote=skip_obsolete)
     if subgraph:
         descendants = set(nx.descendants(graph, subgraph))
         graph = nx.subgraph(graph, descendants)
