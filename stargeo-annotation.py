@@ -67,7 +67,7 @@ samples[:3]
 samples_with_disease = samples.dropna(subset=['disease'])
 
 #%%
-from misc import pandas_monkey
+from lib import pandas_monkey
 pandas_monkey.pandas_patch()
 #%%
 se = samples_with_disease.expand('disease')

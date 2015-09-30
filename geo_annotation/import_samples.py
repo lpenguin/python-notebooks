@@ -6,7 +6,7 @@ from elasticsearch_dsl import Mapping, String, Integer
 from elasticsearch.helpers import bulk
 import pymongo
 from time import sleep
-from misc.utils import iter_bucket
+from lib.utils import iter_bucket
 
 es = Elasticsearch()
 ies = IndicesClient(es)

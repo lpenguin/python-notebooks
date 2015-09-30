@@ -4,61 +4,77 @@ from os.path import exists
 import networkx as nx
 import numpy as np
 import pandas as pd
+import lib.obo
+import lib.classification.elastic
+import lib.classification.validation
+import data
+
+reload(lib.classification.validation)
+reload(lib.classification.elastic)
+reload(lib.obo)
+reload(data)
+
+from lib.classification.elastic import annotate_index, collapse_matches
+from lib.utils import map_series
+from lib.classification.validation import correct_ratio, incorrect_ratio
 from elasticsearch import Elasticsearch
+from lib.obo import read_ontology
 
-from misc.obo import read_ontology
-import misc.obo
-import geo_annotation.search_utils
-from geo_annotation.search_utils import search_ontology
-from misc.utils import collapse_matches, zip_map_series
 
-reload(geo_annotation.search_utils)
-reload(misc.obo)
 pd.set_option('display.width', 512)
 
-larisa_vd = pd.read_pickle('data/larisa_set_uncleaned.pickle')
-larisa_vd['series'] = larisa_vd['dataset_name'].str.split('_').str.get(0).str.split(' ').str.get(0)
-larisa_vd['id'] = larisa_vd['series'].map(lambda s: int(s[3:]))
-larisa_vd_ids = [int(x) for x in larisa_vd['id'].unique()]
+larisa_series = data.larisa_series()
+
+larisa_ids = list(map(int, larisa_series.index.unique()))
+larisa_vd = pd.DataFrame(dict(classes=larisa_series[['doid']]
+                         .reset_index()
+                         .groupby('id')['doid']
+                         .apply(lambda x: list(set(x)))))
+
 
 es = Elasticsearch()
-# Берем только последователей BTO:0001489 (whole body)
 ontology = read_ontology('data/geo-annotation/doid.obo',
                          exclude_duplicates=True)
 
 # # Граф синонимов
 # synonyms_graph = build_synonyms_graph(ontology, es, 'brenda-ontology')
 
-annotation_result_file = 'data/geo-annotation/series.disease.res1.pickle'
-if not exists(annotation_result_file) or True:
-    res = search_ontology(client=es,
-                          ontology=ontology,
-                          index='series',
-                          ids=larisa_vd_ids)
+annotation_result_file = 'data/geo-annotation/series.disease.res2.pickle'
+if not exists(annotation_result_file):
+    res = annotate_index(client=es,
+                         ontology=ontology,
+                         index='series',
+                         ids=larisa_ids)
 
-    len(res)
-
-    import pickle
-
-    with open(annotation_result_file, 'wb') as f:
-        pickle.dump(res, f)
+    res.to_pickle(annotation_result_file)
 
 else:
-    with open(annotation_result_file, 'rb') as f:
-        res = pickle.load(f)
+    res = pd.read_pickle(annotation_result_file)
 
+res['classes'] = res['classes'].map(collapse_matches(ontology.graph))
+
+compare = pd.merge(res, larisa_vd, left_index=True, right_index=True)
+metrics = pd.DataFrame(dict(
+    correct_ratio=correct_ratio(res, larisa_vd),
+    incorrect_ratio=incorrect_ratio(res, larisa_vd)
+))
 
 def doid_id(item_id):
     return "DOID:{:07}".format(item_id)
 
 
 def ontology_name(item_id):
+    if item_id not in ontology.meta:
+        return item_id
     return ontology.meta[item_id].name
 
 
 def to_name(series_id):
     return "GSE{}".format(series_id)
 
+
+def names(df):
+    return df.applymap(lambda xs: [ontology_name(x) for x in xs])
 
 view = pd.DataFrame.from_records(list(res.items()), columns=('id', 'matches'))
 view['name'] = view['id'].map(to_name)
@@ -84,7 +100,7 @@ view.shape[0], view[view.matches_count == 1].shape[0], view[view.collapsed_match
 # Ок примерно до половины остается с одной тканью, пока все.
 view_m1 = view[view.collapsed_matches_count == 1].copy()
 
-vd = larisa_vd[['doid', 'series']].copy()
+vd = larisa_series[['doid', 'series']].copy()
 vd = pd.DataFrame(vd.groupby('series').doid.apply(lambda x: list(set(x)))).reset_index()
 
 check_m1 = pd.merge(view_m1, vd.set_index('series'), left_index=True, right_index=True)
@@ -115,7 +131,7 @@ check_m1.loc['GSE42252']
 # однако, в синонимах DOID это не проставлено
 def path_length(graph, id1, id2):
     if id1 in graph.nodes() and \
-            id2 in graph.nodes() and \
+                    id2 in graph.nodes() and \
             nx.has_path(graph, id1, id2):
         return len(nx.shortest_path(graph, id1, id2)) - 1 if id1 != id2 else 0
     else:
@@ -123,14 +139,15 @@ def path_length(graph, id1, id2):
 
 
 check_m11 = check_m1[check_m1['doid'].map(lambda d: len(d) == 1)].copy()
-check_m11['has_path_res_vd'] = zip_map_series(lambda matches, doid: doid[0] in ontology.graph.nodes() and
-                                                             ontology.has_path(matches[0], doid[0]),
-                                       [check_m11['collapsed_matches'], check_m11['doid']])
+check_m11['has_path_res_vd'] = map_series(lambda matches, doid: doid[0] in ontology.graph.nodes() and
+                                                                ontology.has_path(matches[0], doid[0]),
+                                          [check_m11['collapsed_matches'], check_m11['doid']])
 
-check_m11['absolute_match'] = zip_map_series(lambda matches, doid: matches[0] == doid[0],
+check_m11['absolute_match'] = map_series(lambda matches, doid: matches[0] == doid[0],
+                                         [check_m11['collapsed_matches'], check_m11['doid']])
+
+check_m11['path_res_vd'] = map_series(lambda m, d: path_length(ontology.graph, m[0], d[0]),
                                       [check_m11['collapsed_matches'], check_m11['doid']])
-
-check_m11['path_res_vd'] = zip_map_series(lambda m, d: path_length(ontology.graph, m[0], d[0]), [check_m11['collapsed_matches'], check_m11['doid']])
 check_m11[~check_m11['has_path_res_vd']]
 check_m11.loc['GSE51725']
 # matches                          [DOID:162]
@@ -184,4 +201,3 @@ check_m11[check_m11.path_res_vd == 4]
 # Такая метрика даст приблизительную оценку насколько "обща" проставленная болезнь
 
 # Теперь сделаем анализ всех попаданий
-

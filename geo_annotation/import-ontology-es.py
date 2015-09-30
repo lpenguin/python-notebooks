@@ -1,8 +1,8 @@
 __author__ = 'nikita'
 from importlib import reload
-import misc.obo
-reload(misc.obo)
-from misc.obo import read_ontology
+import lib.obo
+reload(lib.obo)
+from lib.obo import read_ontology
 
 ontology = read_ontology('data/age-biomarkers/brenda-tissue-ontology.obo', exclude_duplicates=True)
 

@@ -6,12 +6,13 @@
 # * Более расширено: содержится один из синонимов одного
 #                    в одном из синонимов другого
 from importlib import reload
-import misc.obo
-reload(misc.obo)
-from misc.obo import read_ontology
+
+import lib.obo
+
+reload(lib.obo)
+from lib.obo import read_ontology
 import networkx as nx
 import numpy as np
-import pandas as pd
 
 ontology = read_ontology('data/age-biomarkers/brenda-tissue-ontology.obo')
 
@@ -115,7 +116,7 @@ duplicates = set(names_counts[names_counts > 1].index)
 for item in ontology.items():
     item.synonyms = [s for s in item.synonyms if s not in duplicates]
 
-from geo_annotation import search_utils
+from lib.classification import search_utils
 from elasticsearch import Elasticsearch
 es = Elasticsearch()
 
@@ -294,13 +295,13 @@ for (i, j) in zip(*syns_check):
 """
 
 # Напоследок, перезагрузим граф
-import geo_annotation.search_utils
-reload(geo_annotation.search_utils)
+import lib.classification.search_utils
+reload(lib.classification.search_utils)
 ontology = read_ontology('data/age-biomarkers/brenda-tissue-ontology.obo', exclude_duplicates=True)
 
-syns_graph = geo_annotation.search_utils.build_synonyms_graph(ontology=ontology,
+syns_graph = lib.classification.search_utils.build_synonyms_graph(ontology=ontology,
                                                               client=es,
                                                               index='brenda-ontology')
 
-for d in geo_annotation.search_utils.analyze_digraph(syns_graph, ontology):
+for d in lib.classification.search_utils.analyze_digraph(syns_graph, ontology):
     print(d)

@@ -1,17 +1,18 @@
 from importlib import reload
+
 import networkx as nx
-import numpy as np
 import pandas as pd
-from misc.obo import read_ontology
-import misc.obo
-import geo_annotation.search_utils
-from geo_annotation.search_utils import search_ontology, build_synonyms_graph
 from elasticsearch import Elasticsearch
-from misc.utils import align_length_dict
 import pymonad
 
-reload(geo_annotation.search_utils)
-reload(misc.obo)
+from lib.obo import read_ontology
+import lib.obo
+import lib.classification.search_utils
+from lib.classification.search_utils import search_ontology, build_synonyms_graph
+from lib.utils import align_length_dict
+
+reload(lib.classification.search_utils)
+reload(lib.obo)
 pd.set_option('display.width', 512)
 
 larisa_vd = pd.read_pickle('data/larisa_set_uncleaned.pickle')

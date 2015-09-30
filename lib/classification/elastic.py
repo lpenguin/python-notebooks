@@ -5,7 +5,8 @@ from elasticsearch_dsl import Search
 import networkx as nx
 import numpy as np
 import pandas as pd
-from misc.obo import Record, Ontology
+import pymonad
+from lib.obo import Record, Ontology
 
 
 def iter_search(search):
@@ -26,7 +27,7 @@ def query_for_terms(terms, fields):
     return Q('bool', should=qs)
 
 
-def search_term(es, term, index, fields=None, ids=None, id_field='id') -> [str]:
+def search_term(es, term, index, fields=None, ids=None, id_field='id', debug=False) -> [str]:
     fields = fields or ['_all']
     ids = ids or []
 
@@ -40,32 +41,46 @@ def search_term(es, term, index, fields=None, ids=None, id_field='id') -> [str]:
         s = s.query(query_for_term(term, fields))
 
     s = s.extra(fields=[id_field])
-    # print(s.to_dict())
+    if debug:
+        print(s.to_dict())
     return [item._d_[id_field][0] for item in iter_search(s)]
 
 
-def search_item(client: Elasticsearch, item: Record, index: str, ids: [str]=None, id_field: str='id'):
+def search_item(client: Elasticsearch, item: Record, index: str, ids: [str]=None, id_field: str='id', **kvargs):
     return search_term(es=client,
                        term=item.names(),
                        index=index,
                        ids=ids,
-                       id_field=id_field)
+                       id_field=id_field, **kvargs)
 
 
-def search_ontology(client: Elasticsearch, ontology: Ontology, index: str, ids: [str]=None, id_field: str='id'):
+def search_ontology(client: Elasticsearch, ontology: Ontology, index: str, ids: [str]=None, id_field: str='id', **kvargs):
     res = defaultdict(list)
     for item in ontology.items():
         res_ids = search_item(client=client,
                               item=item,
                               index=index,
                               ids=ids,
-                              id_field=id_field
-                              )
+                              id_field=id_field,
+                              **kvargs)
         #        item_id = item.int_id()
         item_id = item.id
         for i in res_ids:
             res[i].append(item_id)
     return dict(res)
+
+
+def annotate_index(client: Elasticsearch, ontology: Ontology, index: str, ids: [str]=None, id_field: str='id')->pd.DataFrame:
+    res = search_ontology(client=client,
+                          ontology=ontology,
+                          index=index,
+                          ids=ids,
+                          id_field=id_field)
+
+    return pd.DataFrame.from_records(
+        list(res.items()),
+        columns=['item', 'classes'],
+    ).set_index('item')
 
 
 def build_synonyms_graph(ontology: Ontology, client: Elasticsearch, index: str)->nx.DiGraph:
@@ -108,3 +123,29 @@ def analyze_digraph(graph: nx.DiGraph, ontology: Ontology):
 
         res.append(d)
     return res
+
+
+@pymonad.curry
+def collapse_matches(graph: nx.DiGraph, matches):
+    g = nx.DiGraph()
+    g.add_nodes_from(matches)
+    for id1 in matches:
+        for id2 in matches:
+            if id1 not in graph:
+                print('{}  not in graph'.format(id1))
+                continue
+
+            if id2 not in graph:
+                print('{}  not in graph'.format(id2))
+                continue
+
+            if id1 != id2 and nx.has_path(graph, id1, id2):
+                g.add_edge(id1, id2)
+
+    leafs = []
+    for subg in nx.weakly_connected_component_subgraphs(g):
+        for node in subg.nodes_iter():
+            if not subg.successors(node):
+                leafs.append(node)
+
+    return leafs
