@@ -48,7 +48,7 @@ def read_obo(file_name, kind='dict'):
             if item_type == '[Term]':
                 items.append(item)
             elif item_type == '[Typedef]':
-                typedefs.append(item)
+                    typedefs.append(item)
 
     return (header, items)
 
@@ -159,7 +159,10 @@ def _iter_terms(fd_iter):
 
 
 def _iter_lines(fd):
+    # i = 0
     for line in fd:
+        # print(i)
+        # i += 1
         yield line.rstrip('\n')
 
 
@@ -168,5 +171,6 @@ def _read_term(fd_iter):
     for line in fd_iter:
         if not line:
             return res
+        # print(line)
         key, value = line.split(": ", 1)
         res[key].append(value.strip())

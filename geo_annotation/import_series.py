@@ -28,18 +28,18 @@ m.field('overall_design', String())
 
 m.save('series', using=es)
 
-ies.put_settings(index='series', body={
-    "analysis":{
-      "analyzer":{
-        "default":{
-          "type":"custom",
-          "tokenizer":"standard",
-          "filter":[ "standard", "lowercase", "stop", "kstem" ]
-        }
-      }
-    }
-})
-sleep(1)
+# ies.put_settings(index='series', body={
+#     "analysis":{
+#       "analyzer":{
+#         "default":{
+#           "type":"custom",
+#           "tokenizer":"standard",
+#           "filter":[ "standard", "lowercase", "stop", "kstem" ]
+#         }
+#       }
+#     }
+# })
+# sleep(1)
 ies.open('series')
 
 import pymongo

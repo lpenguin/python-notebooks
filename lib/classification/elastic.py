@@ -19,7 +19,7 @@ def iter_search(search):
 
 
 def query_for_term(term, fields):
-    return MultiMatch(query=term, fields=fields, type='phrase', slop=3)
+    return MultiMatch(query=term, fields=fields, type='phrase')
 
 
 def query_for_terms(terms, fields):
@@ -97,7 +97,8 @@ def build_synonyms_graph(ontology: Ontology, client: Elasticsearch, index: str)-
     return graph
 
 
-def analyze_digraph(graph: nx.DiGraph, ontology: Ontology):
+def analyze_digraph(ontology: Ontology):
+    graph = ontology.graph
     res = []
     mat = nx.to_numpy_matrix(graph)
 
