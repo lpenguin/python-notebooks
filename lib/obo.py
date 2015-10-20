@@ -2,6 +2,7 @@ from collections import defaultdict
 import networkx as nx
 import re
 import pandas as pd
+import numpy as np
 
 def read_obo_as_graph(file_name):
     _, items = read_obo(file_name)
@@ -29,6 +30,7 @@ def read_ontology(file_name: str, exclude_duplicates: bool=False, subgraph=None)
     graph, records = read_obo_as_graph(file_name)
     if subgraph:
         descendants = set(nx.descendants(graph, subgraph))
+        descendants.add(subgraph)
         graph = nx.subgraph(graph, descendants)
         records = [r for r in records if r.id in descendants]
 
@@ -145,6 +147,33 @@ class Ontology:
             (item.id, item) for item in records
         )
 
+    def to_parent_f(self, node_ids):
+        if isinstance(node_ids, str):
+            node_ids = [node_ids]
+
+        mapping = dict((node_id, parent_id)
+                         for node_id, _ in self.meta.items()
+                         for parent_id in node_ids 
+                         if parent_id in self.graph and self.has_path(parent_id, node_id)
+        )
+
+        return lambda t: mapping.get(t, np.nan) if pd.notnull(t) else t
+
+
+    def descendants(self, node_id, level=1):
+        def descendants_level(graph, node, level):
+            if level == 0:
+                return [node]
+            else:
+                successors = graph.successors(node)
+                res = []
+                for succ in successors:
+                    res += descendants_level(graph, succ, level - 1)
+                return res
+        return list(set(descendants_level(self.graph, node_id, level)))
+
+    def name(self, node_id):
+        return self.meta[node_id].name if node_id in self.meta else np.nan
 
     def has_path(self, id1, id2):
         return nx.has_path(self.graph, id1, id2)

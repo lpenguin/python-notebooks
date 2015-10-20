@@ -2,7 +2,8 @@ from itertools import islice
 import itertools
 
 import pandas as pd
-
+import json
+import gzip
 
 def iter_window(seq, n=2):
     "Returns a sliding window (of width n) over data from the iterable"
@@ -84,3 +85,38 @@ def expand_dataframe(df, column_name):
 
 def flatten(iters):
     return itertools.chain.from_iterable(iters)
+
+
+def write_json(data, file_name):
+    with open(file_name, 'w') as f:
+        json.dump(data, f)
+        
+
+def read_json(file_name):
+    with open(file_name, 'r') as f:
+        return json.load(f)
+    
+def list_set(xs):
+    return list(set(xs))
+
+
+# levenshtein distance
+def levenshtein(s1, s2):
+    if len(s1) < len(s2):
+        return levenshtein(s2, s1)
+
+    # len(s1) >= len(s2)
+    if len(s2) == 0:
+        return len(s1)
+
+    previous_row = range(len(s2) + 1)
+    for i, c1 in enumerate(s1):
+        current_row = [i + 1]
+        for j, c2 in enumerate(s2):
+            insertions = previous_row[j + 1] + 1 # j+1 instead of j since previous_row and current_row are one character longer
+            deletions = current_row[j] + 1       # than s2
+            substitutions = previous_row[j] + (c1 != c2)
+            current_row.append(min(insertions, deletions, substitutions))
+        previous_row = current_row
+    
+    return previous_row[-1]

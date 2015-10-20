@@ -18,16 +18,16 @@ def iter_search(search):
             yield item
 
 
-def query_for_term(term, fields):
+def query_for_term(term, fields, slop=0):
     return MultiMatch(query=term, fields=fields, type='phrase')
 
 
-def query_for_terms(terms, fields):
+def query_for_terms(terms, fields, slop=0, operator='should'):
     qs = [query_for_term(term, fields) for term in terms]
-    return Q('bool', should=qs)
+    return Q('bool', **({operator: qs}))
 
 
-def search_term(es, term, index, fields=None, ids=None, id_field='id', debug=False) -> [str]:
+def search_term(es, term, index, fields=None, ids=None, id_field='id', debug=False, slop=0) -> [str]:
     fields = fields or ['_all']
     ids = ids or []
 
@@ -36,9 +36,9 @@ def search_term(es, term, index, fields=None, ids=None, id_field='id', debug=Fal
         s = s.filter('terms', **{id_field: ids})
 
     if isinstance(term, list):
-        s = s.query(query_for_terms(term, fields))
+        s = s.query(query_for_terms(term, fields, slop=slop))
     else:
-        s = s.query(query_for_term(term, fields))
+        s = s.query(query_for_term(term, fields, slop=slop))
 
     s = s.extra(fields=[id_field])
     if debug:
@@ -70,7 +70,8 @@ def search_ontology(client: Elasticsearch, ontology: Ontology, index: str, ids: 
     return dict(res)
 
 
-def annotate_index(client: Elasticsearch, ontology: Ontology, index: str, ids: [str]=None, id_field: str='id')->pd.DataFrame:
+def annotate_index(client: Elasticsearch, ontology: Ontology, index: str, 
+                   ids: [str]=None, id_field: str='id', **kvargs)->pd.DataFrame:
     res = search_ontology(client=client,
                           ontology=ontology,
                           index=index,
