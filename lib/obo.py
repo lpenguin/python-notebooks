@@ -4,6 +4,14 @@ import re
 import pandas as pd
 import numpy as np
 
+def to_dict(ontology: 'Ontology'):
+    def item_to_dict(item: 'Record')->dict:
+        item_dict = item.dict()
+        item_dict['parents'] = item.get_parents()
+        return item_dict
+        
+    return [to_dict(item) for item in ontology.items()]
+    
 def read_obo_as_graph(file_name):
     _, items = read_obo(file_name)
     items = [Record(item) for item in items if 'is_obsolete' not in item]
