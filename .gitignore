@@ -9,3 +9,4 @@ jupyterhub.sqlite
 jupyterhub_config.py
 jupyterhub_cookie_secret
 .idea
+*/__pycache__/*
